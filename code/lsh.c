@@ -24,6 +24,8 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+#include <limits.h> // For PATH_MAX
+
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
 
@@ -53,6 +55,14 @@ int main(void)
       {
         // Just prints cmd
         print_cmd(&cmd);
+
+        //getcwd
+        //char buffer[PATH_MAX];
+        //char* pwd = getcwd(buffer, PATH_MAX);
+        //printf("Current working directory: %s\n", pwd);
+
+        //execute command
+        execute_cmd(&cmd);
       }
       else
       {
@@ -65,6 +75,24 @@ int main(void)
   }
 
   return 0;
+}
+
+void execute_cmd(Command *cmd_list)
+{
+  int pid = fork();
+  if (pid == 0)
+  {
+    execvp(cmd_list->pgm->pgmlist[0], cmd_list->pgm->pgmlist);
+  }
+  else if (pid > 0)
+  {
+    wait(NULL);
+  }
+  else
+  {
+    perror("Fork failed");
+    exit(1);
+  }
 }
 
 /*
