@@ -25,6 +25,7 @@
 #include <readline/history.h>
 
 #include <limits.h> // For PATH_MAX
+#include <signal.h> // For signal handling
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
@@ -35,9 +36,11 @@ static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void execute_cmd(Command *cmd_list);
+void handle_sigint(int signal);
 
 int main(void)
 {
+  signal(SIGINT, handle_sigint);
   for (;;)
   {
     //getcwd
@@ -90,26 +93,37 @@ void execute_cmd(Command *cmd_list)
   char** args = cmd_list->pgm->pgmlist;
   int background = cmd_list->background;
 
-  int pid = fork();   
-  if (pid == 0)
+  for (int i = 0; args[i] != NULL; i++)
   {
-    execvp(args[0], args);
-  }
-  else if (pid > 0)
-  {
-    if (background)
+    int pid = fork();   
+    if (pid == 0)
     {
-      int parent_pid = getpid();
-      printf("Process running in background with PID: %d\n parent PID: %d\n", pid, parent_pid);
-      return;
+      execvp(args[i], args);
     }
-    else wait(NULL);
+    else if (pid > 0)
+    {
+      if (background)
+      {
+        int parent_pid = getpid();
+        printf("Process running in background with PID: %d\nParent PID: %d\n", pid, parent_pid);
+        return;
+      }
+      else wait(NULL);
+    }
+    else
+    {
+      perror("Fork failed");
+      exit(1);
+    }
+    //printf("Executing command: %s\n", args[i]);
+    //printf("arg[%d]: %s\n", i, args[i]);
   }
-  else
-  {
-    perror("Fork failed");
-    exit(1);
-  }
+}
+
+void handle_sigint(int signal)
+{
+  printf("\n Hopefully did something\n");
+  exit(0);
 }
 
 /*
