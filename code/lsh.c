@@ -40,7 +40,7 @@ void handle_sigint(int signal);
 
 int main(void)
 {
-  signal(SIGINT, handle_sigint);
+  signal(SIGINT, SIG_DFL);
   for (;;)
   {
     //getcwd
@@ -120,11 +120,11 @@ void execute_cmd(Command *cmd_list)
   }
 }
 
-void handle_sigint(int signal)
-{
-  printf("\n Hopefully did something\n");
-  exit(0);
-}
+///void handle_sigint(int signal)
+///{
+///  printf("\nHopefully did something\n");
+///  continue;
+///}
 
 /*
  * Print a Command structure as returned by parse on stdout.
