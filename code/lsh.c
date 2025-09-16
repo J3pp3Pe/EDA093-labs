@@ -53,6 +53,10 @@ int main(void)
     {
       printf("EOF\n");
       break; 
+    }else if(strcmp(line, "exit") == 0)
+    {
+      free(line);
+      break; 
     }
 
     // Remove leading and trailing whitespace from the line
