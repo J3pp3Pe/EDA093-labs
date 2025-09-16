@@ -34,13 +34,26 @@
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
+void execute_cmd(Command *cmd_list);
 
 int main(void)
 {
   for (;;)
   {
+    //getcwd
+    char buffer[PATH_MAX];
+    char* pwd = getcwd(buffer, PATH_MAX);
+    //printf("%s$ ", pwd);
+    
     char *line;
     line = readline("> ");
+
+    // EOF handling
+    if (line == NULL)
+    {
+      printf("EOF\n");
+      break; 
+    }
 
     // Remove leading and trailing whitespace from the line
     stripwhite(line);
@@ -55,12 +68,7 @@ int main(void)
       {
         // Just prints cmd
         print_cmd(&cmd);
-
-        //getcwd
-        //char buffer[PATH_MAX];
-        //char* pwd = getcwd(buffer, PATH_MAX);
-        //printf("Current working directory: %s\n", pwd);
-
+        
         //execute command
         execute_cmd(&cmd);
       }
@@ -79,14 +87,23 @@ int main(void)
 
 void execute_cmd(Command *cmd_list)
 {
-  int pid = fork();
+  char** args = cmd_list->pgm->pgmlist;
+  int background = cmd_list->background;
+
+  int pid = fork();   
   if (pid == 0)
   {
-    execvp(cmd_list->pgm->pgmlist[0], cmd_list->pgm->pgmlist);
+    execvp(args[0], args);
   }
   else if (pid > 0)
   {
-    wait(NULL);
+    if (background)
+    {
+      int parent_pid = getpid();
+      printf("Process running in background with PID: %d\n parent PID: %d\n", pid, parent_pid);
+      return;
+    }
+    else wait(NULL);
   }
   else
   {
