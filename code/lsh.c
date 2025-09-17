@@ -36,9 +36,20 @@ static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void execute_cmd(Command *cmd_list);
+void sigchld_handler();
+
+pid_t bg_pids[100];
+int bg_count = 0;
+
+void sigchld_handler() {
+    int status;
+    while (waitpid(-1, &status, WNOHANG) > 0);
+}
 
 int main(void)
 {
+  signal(SIGCHLD, sigchld_handler);
+
   for (;;)
   {
     char *line;
@@ -79,6 +90,11 @@ int main(void)
     free(line);
   }
 
+  // Kill any remaining background processes
+  for(int i = 0; i < bg_count; i++) {
+    kill(bg_pids[i], SIGTERM);
+  }
+
   return 0;
 }
 
@@ -96,6 +112,7 @@ void execute_cmd(Command *cmd_list)
   {
     if (background)
     {
+      bg_pids[bg_count++] = pid;
       int parent_pid = getpid();
       printf("Process running in background with PID: %d\n parent PID: %d\n", pid, parent_pid);
       return;
