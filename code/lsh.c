@@ -26,6 +26,7 @@
 
 #include <limits.h> // For PATH_MAX
 #include <signal.h> // For signal handling
+#include <fcntl.h>  // For file control operations (open)
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
@@ -40,14 +41,10 @@ void handle_sigint(int signal);
 
 int main(void)
 {
+  // Handle SIGINT (Ctrl+C). Currently using default behaviour.
   signal(SIGINT, SIG_DFL);
   for (;;)
   {
-    //getcwd
-    char buffer[PATH_MAX];
-    char* pwd = getcwd(buffer, PATH_MAX);
-    //printf("%s$ ", pwd);
-    
     char *line;
     line = readline("> ");
 
@@ -90,41 +87,92 @@ int main(void)
 
 void execute_cmd(Command *cmd_list)
 {
-  char** args = cmd_list->pgm->pgmlist;
-  int background = cmd_list->background;
+  int depth = 0;
+  for (Pgm *p = cmd_list->pgm; p; p = p->next) depth++;
+  int prev_pipe = -1;
+  Pgm *pgm = cmd_list->pgm;
+  pid_t pids[depth];
 
-  for (int i = 0; args[i] != NULL; i++)
+  for (int i = 0; i < depth; i++, pgm = pgm->next)
   {
-    int pid = fork();   
+    int pipefd[2] = {-1, -1};
+    int pid = fork();
+
+    if (pid < 0)
+    {
+      perror("Fork forked");
+      if (pipe(pipefd[0]) == -1) close(pipefd[0]);
+      if (pipe(pipefd[1]) == -1) close(pipefd[1]);
+      if (prev_pipe != -1) close(prev_pipe);
+      return;
+    }
+
+    //Child process
     if (pid == 0)
     {
-      execvp(args[i], args);
-    }
-    else if (pid > 0)
-    {
-      if (background)
+      if (i == 0)
       {
-        int parent_pid = getpid();
-        printf("Process running in background with PID: %d\nParent PID: %d\n", pid, parent_pid);
-        return;
+        if (cmd_list->rstdin) {
+          int fd = open(cmd_list->rstdin, O_RDONLY);
+          if (fd < 0) printf("We got an error at line 113");
+          if (dup2(fd, STDIN_FILENO) < 0) printf("We got an error at line 115");
+          close(fd);
+        }
       }
-      else wait(NULL);
+        if (i == depth - 1)
+        {
+        if (dup2(pipefd[1], STDOUT_FILENO) < 0) printf("We got an error at line 121");
+        }
+        else if (cmd_list->rstdout)
+        {
+          int fd = open(cmd_list->rstdout, O_WRONLY);
+          if (fd < 0) printf("We got an error at line 126");
+          if (dup2(fd, STDOUT_FILENO) < 0) printf("We got an error at line 127");
+          close(fd);
+        }
+        if (pipefd[0] != -1) close(pipefd[0]);
+        if (pipefd[1] != -1) close(pipefd[1]);
+        if (prev_pipe != -1) close(prev_pipe);
+
+        if (!pgm->pgmlist || !pgm->pgmlist[0])
+        {
+          perror("Error at line 134, no command found?");
+          _exit(127);
+        }
+        execvp(pgm->pgmlist[0], pgm->pgmlist);
+        perror("Error at line 138, execvp failed?");
+        _exit(127);
+    }
+      // Parent process
+      pids[i] = pid;
+
+      if (prev_pipe != -1) close(prev_pipe);
+      if (pipefd[1] != -1) close(pipefd[1]);
+      prev_pipe = pipefd[0];
+    }
+
+    if (prev_pipe != -1) close(prev_pipe);
+
+    if (cmd_list->background)
+    {
+      int parent_pid = getpid();
+      for (int i = 0; i < depth; i++) printf("Process running in background with PID: %d\nParent PID: %d\n", pids[i], parent_pid);
     }
     else
     {
-      perror("Fork failed");
-      exit(1);
+      int running;
+      for (int i = 0; i < depth; i++)
+      {
+        waitpid(pids[i], &running, 0);
+      }
     }
-    //printf("Executing command: %s\n", args[i]);
-    //printf("arg[%d]: %s\n", i, args[i]);
-  }
 }
 
-///void handle_sigint(int signal)
-///{
-///  printf("\nHopefully did something\n");
-///  continue;
-///}
+void handle_sigint(int signal)
+{
+  printf("\nHopefully did something\n");
+  exit(0);
+}
 
 /*
  * Print a Command structure as returned by parse on stdout.
@@ -197,3 +245,34 @@ void stripwhite(char *string)
 
   string[++i] = '\0';
 }
+
+//Unused code
+
+//getcwd
+//char buffer[PATH_MAX];
+//char* pwd = getcwd(buffer, PATH_MAX);
+//printf("%s$ ", pwd);
+
+//char** args = cmd_list->pgm->pgmlist;
+//int background = cmd_list->background;
+//
+//int pid = fork();
+//if (pid == 0)
+//{
+//  execvp(args[0], args);
+//}
+//  else if (pid > 0)
+//  {
+//    if (background)
+//    {
+//      int parent_pid = getpid();
+//      printf("Process running in background with PID: %d\nParent PID: %d\n", pid, parent_pid);
+//      return;
+//    }
+//    else wait(NULL);
+//  }
+//  else
+//  {
+//    perror("Fork failed");
+//    exit(1);
+//  }
