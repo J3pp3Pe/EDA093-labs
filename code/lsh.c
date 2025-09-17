@@ -31,14 +31,20 @@
 #include <unistd.h>
 
 #include "parse.h"
+#include <signal.h>
 
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void execute_cmd(Command *cmd_list);
+void sigChildHandler(int sig);
 
 int main(void)
 {
+
+  signal(SIGCHLD, sigChildHandler);
+  signal(SIGINT, SIG_IGN);
+
   for (;;)
   {
     char *line;
@@ -90,6 +96,7 @@ void execute_cmd(Command *cmd_list)
   int pid = fork();   
   if (pid == 0)
   {
+    if (!background) {signal(SIGINT, SIG_DFL);} // Restore default signal handling for Ctrl-C in child foreground process
     execvp(args[0], args);
   }
   else if (pid > 0)
@@ -100,7 +107,7 @@ void execute_cmd(Command *cmd_list)
       printf("Process running in background with PID: %d\n parent PID: %d\n", pid, parent_pid);
       return;
     }
-    else wait(NULL);
+    wait(NULL);
   }
   else
   {
@@ -108,6 +115,13 @@ void execute_cmd(Command *cmd_list)
     exit(1);
   }
 }
+
+void sigChildHandler(int sig) 
+{
+  int status;
+  while(waitpid(-1, &status, WNOHANG) > 0);
+}
+
 
 /*
  * Print a Command structure as returned by parse on stdout.
