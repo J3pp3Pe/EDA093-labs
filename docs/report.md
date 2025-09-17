@@ -7,6 +7,7 @@ background processess
 pipe (not really)
 ctrl-c sigint (partial)
 pipe
+redirects
 
 The first thing we did on this lab was to get things to execute properly. We made a execute_cmd() function, which utilized fork(), and we tried to make the child execute using execvp().
 After some failed attempts at gettings "ls" to work we realized that we have no idea of what's going on and where we are. So we couldn't know if "ls" would print anything.
@@ -27,3 +28,5 @@ At this point i realized that I had misunderstood the piping, and everything I d
 
 At an even later point I realized that I didn't completly misunderstand piping, and that some logic would still work.
 After some trial and error with all fds et.c it seems to work. There's still some work needed to be done with error handling, and probably some edge cases. But the basic functionality of piping works.
+
+We noticed that redirects only worked when we had pipes, which was due to a problem with out loop logic. This was quickly fixed, but we noticed that redirects was still giving us some problems, this was caused due to us not having the appropriate arguments/flags to the open() function.
