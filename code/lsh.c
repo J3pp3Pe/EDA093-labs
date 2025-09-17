@@ -23,8 +23,8 @@
 #include <string.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <signal.h>
 #include <sys/wait.h>
-
 #include <limits.h> // For PATH_MAX
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
@@ -43,12 +43,10 @@ int main(void)
 {
 
   signal(SIGCHLD, sigChildHandler);
+  signal(SIGINT, SIG_IGN);
 
   for (;;)
   {
-
-    signal(SIGINT, SIG_IGN);
-    
     char *line;
     line = readline("> ");
 
@@ -60,7 +58,7 @@ int main(void)
     }else if(strcmp(line, "exit") == 0)
     {
       free(line);
-      break; 
+      break;
     }
 
     // Remove leading and trailing whitespace from the line
@@ -74,10 +72,7 @@ int main(void)
       Command cmd;
       if (parse(line, &cmd) == 1)
       {
-        // Just prints cmd
         print_cmd(&cmd);
-        
-        //execute command
         execute_cmd(&cmd);
       }
       else
@@ -171,7 +166,6 @@ static void print_pgm(Pgm *p)
     printf("]\n");
   }
 }
-
 
 /* Strip whitespace from the start and end of a string.
  *
