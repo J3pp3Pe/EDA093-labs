@@ -119,13 +119,13 @@ void execute_cmd(Command *cmd_list)
           close(fd);
         }
       }
-        if (i == depth - 1)
+        if (i == depth)
         {
         if (dup2(pipefd[1], STDOUT_FILENO) < 0) printf("We got an error at line 121");
         }
         else if (cmd_list->rstdout)
         {
-          int fd = open(cmd_list->rstdout, O_WRONLY);
+          int fd = open(cmd_list->rstdout, O_WRONLY | O_CREAT | O_TRUNC, 0644);
           if (fd < 0) printf("We got an error at line 126");
           if (dup2(fd, STDOUT_FILENO) < 0) printf("We got an error at line 127");
           close(fd);
