@@ -4,8 +4,9 @@ getcwd
 execute a program
 ctrl-d EOF
 background processess
-pipe (partial)
+pipe (not really)
 ctrl-c sigint (partial)
+pipe
 
 The first thing we did on this lab was to get things to execute properly. We made a execute_cmd() function, which utilized fork(), and we tried to make the child execute using execvp().
 After some failed attempts at gettings "ls" to work we realized that we have no idea of what's going on and where we are. So we couldn't know if "ls" would print anything.
@@ -21,3 +22,8 @@ The next functionality on the list was pipes, so we started to work on that and 
 So we decided to move on for now, as we need to implement function arguments first.
 
 Since we didn't have to much time left on the lab session we decided to implement something quick. So we decided to implement sigint (ctrl-c). We quickly got it to work, but the ctrl-c behaviour was a bit to aggressive, it killed the entire shell. So we had to fix the sig_handler function to work for our usecase.
+
+At this point i realized that I had misunderstood the piping, and everything I did with piping had to be done over.
+
+At an even later point I realized that I didn't completly misunderstand piping, and that some logic would still work.
+After some trial and error with all fds et.c it seems to work. There's still some work needed to be done with error handling, and probably some edge cases. But the basic functionality of piping works.
