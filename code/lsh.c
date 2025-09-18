@@ -38,11 +38,13 @@ static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void execute_cmd(Command *cmd_list);
 void handle_sigint(int signal);
+void handle_sigchld(int signal);
 
 int main(void)
 {
   // Handle SIGINT (Ctrl+C). Currently using default behaviour.
   signal(SIGINT, SIG_DFL);
+  signal(SIGCHLD, handle_sigchld); // Prevent zombie processes
   for (;;)
   {
     char *line;
@@ -88,90 +90,110 @@ int main(void)
 void execute_cmd(Command *cmd_list)
 {
   int depth = 0;
+  int i = 0;
   for (Pgm *p = cmd_list->pgm; p; p = p->next) depth++;
+  // pgm stack, for reversing the order
+  Pgm *pgm_stack[depth];
+  for (Pgm *p = cmd_list->pgm; p; p = p->next) pgm_stack[i++] = p;
+
   int prev_pipe = -1;
   Pgm *pgm = cmd_list->pgm;
   pid_t pids[depth];
 
   for (int i = 0; i < depth; i++, pgm = pgm->next)
   {
+    // reverses the order of commands
+    Pgm *pgm = pgm_stack[depth - i - 1];
     int pipefd[2] = {-1, -1};
-    int pid = fork();
+    if (i != depth - 1)
+    {
+      if (pipe(pipefd) < 0)
+      {
+          perror("works on my machine");
+          if (prev_pipe != -1) close(prev_pipe);
+          return;
+      }
+    }
 
+    int pid = fork();
     if (pid < 0)
     {
       perror("Fork forked");
-      if (pipe(pipefd[0]) == -1) close(pipefd[0]);
-      if (pipe(pipefd[1]) == -1) close(pipefd[1]);
+      if (pipefd[0] != -1) close(pipefd[0]);
+      if (pipefd[1] != -1) close(pipefd[1]);
       if (prev_pipe != -1) close(prev_pipe);
       return;
     }
 
-    //Child process
     if (pid == 0)
     {
-      if (i == 0)
-      {
-        if (cmd_list->rstdin) {
-          int fd = open(cmd_list->rstdin, O_RDONLY);
-          if (fd < 0) printf("We got an error at line 113");
-          if (dup2(fd, STDIN_FILENO) < 0) printf("We got an error at line 115");
-          close(fd);
-        }
+      // rstdin
+      if (i == 0 && cmd_list->rstdin) {
+        int fd = open(cmd_list->rstdin, O_RDONLY);
+        if (fd < 0) { perror("error opening at line 133"); _exit(1); }
+        if (dup2(fd, STDIN_FILENO) < 0) { perror("error line 134"); _exit(1); }
+        close(fd);
+      } else if (prev_pipe != -1) {
+        if (dup2(prev_pipe, STDIN_FILENO) < 0) { perror("error line 137"); _exit(1); }
       }
-        if (i == depth)
-        {
-        if (dup2(pipefd[1], STDOUT_FILENO) < 0) printf("We got an error at line 121");
-        }
-        else if (cmd_list->rstdout)
-        {
-          int fd = open(cmd_list->rstdout, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-          if (fd < 0) printf("We got an error at line 126");
-          if (dup2(fd, STDOUT_FILENO) < 0) printf("We got an error at line 127");
-          close(fd);
-        }
-        if (pipefd[0] != -1) close(pipefd[0]);
-        if (pipefd[1] != -1) close(pipefd[1]);
-        if (prev_pipe != -1) close(prev_pipe);
 
-        if (!pgm->pgmlist || !pgm->pgmlist[0])
-        {
-          perror("Error at line 134, no command found?");
-          _exit(127);
-        }
-        execvp(pgm->pgmlist[0], pgm->pgmlist);
-        perror("Error at line 138, execvp failed?");
-        _exit(127);
-    }
-      // Parent process
-      pids[i] = pid;
+      // rstdout
+      if (i != depth - 1) {
+        if (dup2(pipefd[1], STDOUT_FILENO) < 0) { perror("error line 142"); _exit(1); }
+      } else if (cmd_list->rstdout) {
+        int fd = open(cmd_list->rstdout, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0) { perror("error line 145"); _exit(1); }
+        if (dup2(fd, STDOUT_FILENO) < 0) { perror("error line 146"); _exit(1); }
+        close(fd);
+      }
 
-      if (prev_pipe != -1) close(prev_pipe);
+      // Manage pipes
+      if (pipefd[0] != -1) close(pipefd[0]);
       if (pipefd[1] != -1) close(pipefd[1]);
-      prev_pipe = pipefd[0];
+      if (prev_pipe != -1) close(prev_pipe);
+
+      if (!pgm->pgmlist || !pgm->pgmlist[0])
+      {
+        perror("No command");
+        _exit(127);
+      }
+      execvp(pgm->pgmlist[0], pgm->pgmlist);
+      perror("execvp failed");
+      _exit(127);
     }
+    // Parent
+    pids[i] = pid;
 
     if (prev_pipe != -1) close(prev_pipe);
+    if (pipefd[1] != -1) close(pipefd[1]);
+    prev_pipe = pipefd[0];
+  }
 
-    if (cmd_list->background)
+  if (prev_pipe != -1) close(prev_pipe);
+
+  if (cmd_list->background)
+  {
+    int parent_pid = getpid();
+    for (int i = 0; i < depth; i++) printf("Process running in background with PID: %d\nParent PID: %d\n", pids[i], parent_pid);
+  }
+  else
+  {
+    int running;
+    for (int i = 0; i < depth; i++)
     {
-      int parent_pid = getpid();
-      for (int i = 0; i < depth; i++) printf("Process running in background with PID: %d\nParent PID: %d\n", pids[i], parent_pid);
+      waitpid(pids[i], &running, 0);
     }
-    else
-    {
-      int running;
-      for (int i = 0; i < depth; i++)
-      {
-        waitpid(pids[i], &running, 0);
-      }
-    }
+  }
 }
 
 void handle_sigint(int signal)
 {
   printf("\nHopefully did something\n");
   exit(0);
+}
+
+void handle_sigchld(int signal) {
+    while (waitpid(-1, NULL, WNOHANG) > 0);
 }
 
 /*
