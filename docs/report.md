@@ -30,3 +30,4 @@ At an even later point I realized that I didn't completly misunderstand piping, 
 After some trial and error with all fds et.c it seems to work. There's still some work needed to be done with error handling, and probably some edge cases. But the basic functionality of piping works.
 
 We noticed that redirects only worked when we had pipes, which was due to a problem with out loop logic. This was quickly fixed, but we noticed that redirects was still giving us some problems, this was caused due to us not having the appropriate arguments/flags to the open() function.
+Another problem we had to overcome, was the fact that we iterated through the command list in the "wrong order". We fixed this by reversing the linked list by using a temporary stack.
