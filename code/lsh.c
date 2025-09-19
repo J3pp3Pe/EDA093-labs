@@ -37,13 +37,12 @@ static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void execute_cmd(Command *cmd_list);
-void handle_sigint(int signal);
 void handle_sigchld(int signal);
 
 int main(void)
 {
   // Handle SIGINT (Ctrl+C). Currently using default behaviour.
-  signal(SIGINT, SIG_DFL);
+  signal(SIGINT, SIG_IGN);
   signal(SIGCHLD, handle_sigchld); // Prevent zombie processes
   for (;;)
   {
@@ -55,6 +54,10 @@ int main(void)
     {
       printf("EOF\n");
       break; 
+    }else if(strcmp(line, "exit") == 0)
+    {
+      free(line);
+      break;
     }
 
     // Remove leading and trailing whitespace from the line
@@ -89,6 +92,11 @@ int main(void)
 
 void execute_cmd(Command *cmd_list)
 {
+  if (strcmp(cmd_list->pgm->pgmlist[0], "cd") == 0) 
+  {
+    chdir(cmd_list->pgm->pgmlist[1]);
+    return;
+  }
   int depth = 0;
   int i = 0;
   for (Pgm *p = cmd_list->pgm; p; p = p->next) depth++;
@@ -127,6 +135,7 @@ void execute_cmd(Command *cmd_list)
 
     if (pid == 0)
     {
+      if (!cmd_list->background) {signal(SIGINT, SIG_DFL);}
       // rstdin
       if (i == 0 && cmd_list->rstdin) {
         int fd = open(cmd_list->rstdin, O_RDONLY);
@@ -184,12 +193,6 @@ void execute_cmd(Command *cmd_list)
       waitpid(pids[i], &running, 0);
     }
   }
-}
-
-void handle_sigint(int signal)
-{
-  printf("\nHopefully did something\n");
-  exit(0);
 }
 
 void handle_sigchld(int signal) {
