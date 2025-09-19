@@ -93,6 +93,12 @@ void execute_cmd(Command *cmd_list)
   char** args = cmd_list->pgm->pgmlist;
   int background = cmd_list->background;
 
+    if (strcmp(args[0], "cd") == 0) 
+  {
+    chdir(args[1]);
+    return;
+  }
+  
   int pid = fork();   
   if (pid == 0)
   {
@@ -118,8 +124,7 @@ void execute_cmd(Command *cmd_list)
 
 void sigChildHandler(int sig) 
 {
-  int status;
-  while(waitpid(-1, &status, WNOHANG) > 0);
+  while(waitpid(-1, NULL, WNOHANG) > 0);
 }
 
 
