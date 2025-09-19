@@ -141,7 +141,7 @@ void execute_cmd(Command *cmd_list)
       if (i != depth - 1) {
         if (dup2(pipefd[1], STDOUT_FILENO) < 0) { perror("error line 142"); _exit(1); }
       } else if (cmd_list->rstdout) {
-        int fd = open(cmd_list->rstdout, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        int fd = open(cmd_list->rstdout, O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (fd < 0) { perror("error line 145"); _exit(1); }
         if (dup2(fd, STDOUT_FILENO) < 0) { perror("error line 146"); _exit(1); }
         close(fd);
