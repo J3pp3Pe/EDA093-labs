@@ -267,34 +267,3 @@ void stripwhite(char *string)
 
   string[++i] = '\0';
 }
-
-//Unused code
-
-//getcwd
-//char buffer[PATH_MAX];
-//char* pwd = getcwd(buffer, PATH_MAX);
-//printf("%s$ ", pwd);
-
-//char** args = cmd_list->pgm->pgmlist;
-//int background = cmd_list->background;
-//
-//int pid = fork();
-//if (pid == 0)
-//{
-//  execvp(args[0], args);
-//}
-//  else if (pid > 0)
-//  {
-//    if (background)
-//    {
-//      int parent_pid = getpid();
-//      printf("Process running in background with PID: %d\nParent PID: %d\n", pid, parent_pid);
-//      return;
-//    }
-//    else wait(NULL);
-//  }
-//  else
-//  {
-//    perror("Fork failed");
-//    exit(1);
-//  }
