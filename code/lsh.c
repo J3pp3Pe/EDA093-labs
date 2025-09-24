@@ -92,11 +92,13 @@ int main(void)
 
 void execute_cmd(Command *cmd_list)
 {
+  // Handle cd command
   if (strcmp(cmd_list->pgm->pgmlist[0], "cd") == 0) 
   {
     chdir(cmd_list->pgm->pgmlist[1]);
     return;
   }
+  // Count depth of pipeline
   int depth = 0;
   int i = 0;
   for (Pgm *p = cmd_list->pgm; p; p = p->next) depth++;
@@ -117,7 +119,7 @@ void execute_cmd(Command *cmd_list)
     {
       if (pipe(pipefd) < 0)
       {
-          perror("works on my machine");
+          perror("Pipe error");
           if (prev_pipe != -1) close(prev_pipe);
           return;
       }
@@ -126,33 +128,34 @@ void execute_cmd(Command *cmd_list)
     int pid = fork();
     if (pid < 0)
     {
-      perror("Fork forked");
+      perror("Fork error");
       if (pipefd[0] != -1) close(pipefd[0]);
       if (pipefd[1] != -1) close(pipefd[1]);
       if (prev_pipe != -1) close(prev_pipe);
       return;
     }
 
+    // Child processes
     if (pid == 0)
     {
       if (!cmd_list->background) {signal(SIGINT, SIG_DFL);}
       // rstdin
       if (i == 0 && cmd_list->rstdin) {
         int fd = open(cmd_list->rstdin, O_RDONLY);
-        if (fd < 0) { perror("error opening at line 133"); _exit(1); }
-        if (dup2(fd, STDIN_FILENO) < 0) { perror("error line 134"); _exit(1); }
+        if (fd < 0) { perror("error opening input file"); _exit(1); }
+        if (dup2(fd, STDIN_FILENO) < 0) { perror("error redirecting input"); _exit(1); }
         close(fd);
       } else if (prev_pipe != -1) {
-        if (dup2(prev_pipe, STDIN_FILENO) < 0) { perror("error line 137"); _exit(1); }
+        if (dup2(prev_pipe, STDIN_FILENO) < 0) { perror("error redirecting input"); _exit(1); }
       }
 
       // rstdout
       if (i != depth - 1) {
-        if (dup2(pipefd[1], STDOUT_FILENO) < 0) { perror("error line 142"); _exit(1); }
+        if (dup2(pipefd[1], STDOUT_FILENO) < 0) { perror("error opening pipe for writing"); _exit(1); }
       } else if (cmd_list->rstdout) {
         int fd = open(cmd_list->rstdout, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-        if (fd < 0) { perror("error line 145"); _exit(1); }
-        if (dup2(fd, STDOUT_FILENO) < 0) { perror("error line 146"); _exit(1); }
+        if (fd < 0) { perror("error redirecting output"); _exit(1); }
+        if (dup2(fd, STDOUT_FILENO) < 0) { perror("error redirecting output"); _exit(1); }
         close(fd);
       }
 
@@ -170,7 +173,6 @@ void execute_cmd(Command *cmd_list)
       perror("execvp failed");
       _exit(127);
     }
-    // Parent
     pids[i] = pid;
 
     if (prev_pipe != -1) close(prev_pipe);
